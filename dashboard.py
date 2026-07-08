@@ -9,6 +9,7 @@ Run with:
 
 from __future__ import annotations
 
+import io
 import os
 import sys
 
@@ -21,6 +22,7 @@ from excel_parser import ExcelParser
 from rag_engine import RagEngine
 from reasoning import build_narrative
 from action_assistant import build_action_items
+from pptx_builder import build_executive_pptx
 
 st.set_page_config(page_title="Project Health Dashboard", layout="wide")
 
@@ -50,6 +52,46 @@ for f in uploaded:
 
 # ---------------- Portfolio overview ----------------
 st.subheader("Portfolio Overview")
+
+portfolio_data = []
+for project, rag_result, _ in results:
+    m = {mm.name: mm for mm in rag_result.metrics}
+    portfolio_data.append({
+        "name": project.project_name,
+        "pm": project.summary.project_manager,
+        "rag": rag_result.rag,
+        "score": rag_result.composite_score,
+        "confidence": rag_result.confidence,
+        "sheet_status": rag_result.sheet_reported_status,
+        "agrees": rag_result.status_agrees_with_sheet,
+        "pct_complete": m["completion"].facts["avg_pct_complete"],
+        "pct_delayed_tasks": m["schedule_slippage"].facts["pct_delayed_tasks"],
+        "missed_end_dates": m["schedule_slippage"].facts["missed_end_dates"],
+        "avg_delay_days": m["schedule_slippage"].facts["avg_delay_days"],
+        "critical_count": m["critical_tasks"].facts.get("critical_count", 0),
+        "critical_red": m["critical_tasks"].facts.get("critical_red", 0),
+        "critical_delayed": m["critical_tasks"].facts.get("critical_delayed", 0),
+        "flagged_comments": m["blockers"].facts.get("flagged_count", 0),
+        "total_comments": m["blockers"].facts.get("comment_count", 0),
+        "milestones_completed": m["milestones"].facts.get("milestones_completed", 0),
+        "milestones_total": m["milestones"].facts.get("milestone_count", 0),
+        "total_tasks": len(project.tasks),
+        "stage": project.summary.project_stage,
+    })
+
+deck_col1, deck_col2 = st.columns([3, 1])
+with deck_col2:
+    pptx_buffer = io.BytesIO()
+    build_executive_pptx(portfolio_data, pptx_buffer)
+    pptx_buffer.seek(0)
+    st.download_button(
+        "📊 Download Executive Presentation",
+        data=pptx_buffer,
+        file_name="Executive_Project_Health_Review.pptx",
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        use_container_width=True,
+    )
+
 cols = st.columns(len(results)) if len(results) <= 4 else st.columns(4)
 for i, (project, rag_result, _) in enumerate(results):
     col = cols[i % len(cols)]

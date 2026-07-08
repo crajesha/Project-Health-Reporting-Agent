@@ -19,7 +19,6 @@ import glob
 import json
 import logging
 import os
-import subprocess
 import sys
 
 from excel_parser import ExcelParser
@@ -27,6 +26,7 @@ from rag_engine import RagEngine
 from reasoning import build_narrative
 from report_generator import save_weekly_report
 from action_assistant import build_action_items, render_action_items_markdown
+from pptx_builder import build_executive_pptx
 
 logger = logging.getLogger("main")
 
@@ -95,14 +95,11 @@ def run_pipeline(input_files: list[str], out_dir: str, build_deck: bool = True) 
         deck_dir = os.path.join(out_dir, "presentation")
         os.makedirs(deck_dir, exist_ok=True)
         deck_path = os.path.join(deck_dir, "Executive_Project_Health_Review.pptx")
-        script_path = os.path.join(os.path.dirname(__file__), "build_pptx.js")
         try:
-            env = os.environ.copy()
-            env["NODE_PATH"] = subprocess.check_output(["npm", "root", "-g"], text=True).strip()
-            subprocess.run(["node", script_path, portfolio_json_path, deck_path], check=True, env=env)
+            build_executive_pptx(portfolio, deck_path)
             logger.info("Executive presentation written to %s", deck_path)
         except Exception as exc:
-            logger.error("Presentation generation failed: %s", exc)
+            logger.exception("Presentation generation failed: %s", exc)
 
     return portfolio
 
